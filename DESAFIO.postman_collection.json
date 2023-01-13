@@ -1,0 +1,81 @@
+{
+	"info": {
+		"_postman_id": "dda2be22-c767-43d2-b9ad-e82b75981ec8",
+		"name": "DESAFIO",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "17163826"
+	},
+	"item": [
+		{
+			"name": "List",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "localhost:8080/movies/list",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"movies",
+						"list"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Add",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"title\": \"teste aa\",\r\n    \"yearMovie\": 2023,\r\n    \"winner\": false,\r\n    \"studios\": [{\r\n        \"nameStudio\": \"nome estudio\"\r\n    }],\r\n    \"producers\": [{\r\n        \"nameProducer\": \"nome prudutor\"\r\n    }]\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "localhost:8080/movies/add",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"movies",
+						"add"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "projection",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "localhost:8080/movies?projection=max-min-win-interval-for-producers",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"movies"
+					],
+					"query": [
+						{
+							"key": "projection",
+							"value": "max-min-win-interval-for-producers"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
