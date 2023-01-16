@@ -1,10 +1,5 @@
 package desafio.tecnico;
 
-import java.util.List;
-
-import javax.transaction.Transactional;
-
-import desafio.tecnico.entity.PiorFilme;
 import desafio.tecnico.service.PiorFilmeService;
 import io.quarkus.runtime.Quarkus;
 import io.quarkus.runtime.QuarkusApplication;
