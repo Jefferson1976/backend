@@ -6,10 +6,9 @@ import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
-import java.util.stream.Collector;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 import javax.enterprise.context.RequestScoped;
 import javax.transaction.Transactional;
@@ -21,6 +20,7 @@ import desafio.tecnico.entity.Producer;
 import desafio.tecnico.entity.Studio;
 import desafio.tecnico.vo.PiorFilmeMinMaxVO;
 import desafio.tecnico.vo.ProducerVO;
+import io.quarkus.panache.common.Sort;
 
 @RequestScoped
 public class PiorFilmeService {
@@ -77,53 +77,180 @@ public class PiorFilmeService {
     public PiorFilmeMinMaxVO getMinMaxWinner() { 
         PiorFilmeMinMaxVO resp = new PiorFilmeMinMaxVO();
 
-        List<PiorFilme> listaPriorFilme = PiorFilme.listAll();
-        List<ProducerVO> listProducerVO = new ArrayList<>();
+        List<PiorFilme> listaPriorFilme = PiorFilme.listAll(Sort.by("yearMovie").ascending());
+        HashMap<String, List<Integer>> hashProducers = new HashMap<String, List<Integer>>();
 
         for (PiorFilme pf : listaPriorFilme) {
             for (Producer producer : pf.getProducers()) {
-                ProducerVO newProducer = null;
+                List<Integer> yearsWinner = new ArrayList<>();
 
-                boolean encontrou = false;
-                for (ProducerVO producerVO : listProducerVO) {
-                    if (producerVO.getProducer().equals(producer.getNameProducer())) {
-                        encontrou = true;
+                if (hashProducers.get(producer.getNameProducer()) != null) {
+                    hashProducers.get(producer.getNameProducer()).add(pf.getYearMovie());
+                } else {
+                    yearsWinner.add(pf.getYearMovie());
 
-                        if (producerVO.getPreviousWin() > pf.getYearMovie()) {
-                            producerVO.setPreviousWin(pf.getYearMovie());
-                        }
+                    hashProducers.put(producer.getNameProducer(), yearsWinner);
+                }
+            }
+        }
+        // obtem os produtores que ganharam mais de uma vez
+        HashMap<String, List<Integer>> hashProducersWinners = new HashMap<String, List<Integer>>();
+        for (Map.Entry m : hashProducers.entrySet()) {
+            if (((List<Integer>)m.getValue()).size() > 1) {
+                hashProducersWinners.put((String)m.getKey(), (List<Integer>)m.getValue());
+            }
+        }
 
-                        if (producerVO.getFollowingWin() < pf.getYearMovie()) {
-                            producerVO.setFollowingWin(pf.getYearMovie());
-                        }
+        // Obtem o produtor com menor intervalo de prêmio obtido
+        List<ProducerVO> minListProducer = new ArrayList<>();
+        minListProducer.add(this.getMinWinner(hashProducersWinners));
+        resp.setMin(minListProducer);
 
-                        producerVO.setInterval(producerVO.getFollowingWin()-producerVO.getPreviousWin());
+        // Obtem o produtor com maior intervalo de prêmio obtido
+        List<ProducerVO> maxListProducer = new ArrayList<>();
+        maxListProducer.add(this.getMaxWinner(hashProducersWinners));
+        resp.setMax(maxListProducer);
 
+        return resp;
+    }
+
+    public ProducerVO getMinWinner(HashMap<String, List<Integer>> hashProducersWinners) { 
+        // Obtem o menor intervalo de prêmio obtido
+        HashMap<String, List<Integer>> hashProducersWinnersMin = new HashMap<String, List<Integer>>();
+
+        int intervaloMinimo = 1; // ganhou 2 anos seguidos
+        boolean localizouIntervaloMinimo = false;
+
+        do {
+            // verifica todos os produtores para localizar o produtor que ganhou dentro do intervalo mínimo
+            for (Map.Entry m : hashProducersWinners.entrySet()) {
+                List<Integer> yeasrWinner = (List<Integer>)m.getValue();
+
+                for (int i = 1; i <= yeasrWinner.size()-1; i++) {
+                    int aux = yeasrWinner.get(i) - yeasrWinner.get(i-1);
+
+                    if (aux == intervaloMinimo) {
+                        localizouIntervaloMinimo = true;
+                        hashProducersWinnersMin.put((String)m.getKey(), (List<Integer>)m.getValue());
                         break;
                     }
                 }
+            }
 
-                if (!encontrou) {
-                    newProducer = new ProducerVO();
-                    newProducer.setProducer(producer.getNameProducer());
-                    newProducer.setPreviousWin(pf.getYearMovie());
-                    newProducer.setFollowingWin(pf.getYearMovie());
-                    newProducer.setInterval(0);
+            if (!localizouIntervaloMinimo) {
+                intervaloMinimo++;
+            }
+        } while (!localizouIntervaloMinimo);
+        
+        System.out.println("\n\nLista dos Produtores que receberam o prêmio no menor intervalo localizado: \n");
+        for (Map.Entry m : hashProducersWinnersMin.entrySet()) {
+            System.out.println(m.getKey()+" "+m.getValue());
+        }
 
-                    listProducerVO.add(newProducer);
+        // Obtem o primeiro que obteve dois prêmios mais rápido
+        int anoInicialMaisRapido = 0;
+        String nomeProdutorMaisRapido = "";
+        int previous = 0;
+        int followin = 0;
+
+        for (Map.Entry m : hashProducersWinnersMin.entrySet()) {
+            List<Integer> yeasrWinner = (List<Integer>)m.getValue();
+
+            for (int i = 1; i <= yeasrWinner.size()-1; i++) {
+                int aux = yeasrWinner.get(i) - yeasrWinner.get(i-1);
+
+                if ((aux == intervaloMinimo) && 
+                    ((anoInicialMaisRapido == 0) || (yeasrWinner.get(i-1) < anoInicialMaisRapido))) {
+                        anoInicialMaisRapido = yeasrWinner.get(i-1);
+                        nomeProdutorMaisRapido = (String)m.getKey();
+                        previous = yeasrWinner.get(i-1);
+                        followin = yeasrWinner.get(i);
                 }
             }
         }
 
-        // retira os produtores que ganharam apenas uma vez
-        listProducerVO = listProducerVO.stream()
-            .filter(p -> p.getInterval() > 0)
-            .sorted(Comparator.comparingInt(ProducerVO::getInterval))
-            .collect(Collectors.toList());
+        System.out.println("\n\nMenor Ano inicial localizado dentro do intervalo mínimo: " + anoInicialMaisRapido);
+        System.out.println("\nNome do Produtor: " + nomeProdutorMaisRapido);
 
-        resp.setMin(listProducerVO.subList(0, 2));
-        resp.setMax(listProducerVO.subList(listProducerVO.size() - 2, listProducerVO.size()));
+        ProducerVO minProducerVO = new ProducerVO();
+        minProducerVO.setProducer(nomeProdutorMaisRapido);
+        minProducerVO.setPreviousWin(previous);
+        minProducerVO.setFollowingWin(followin);
+        minProducerVO.setInterval(intervaloMinimo);
 
-        return resp;
+        return minProducerVO;
+    }
+
+    public ProducerVO getMaxWinner(HashMap<String, List<Integer>> hashProducersWinners) { 
+        int intervaloMaximo = 2; // ganhou 2 anos seguidos
+
+        // verifica todos os produtores para localizar o maior intervalo
+        for (Map.Entry m : hashProducersWinners.entrySet()) {
+            List<Integer> yeasrWinner = (List<Integer>)m.getValue();
+
+            for (int i = 1; i <= yeasrWinner.size()-1; i++) {
+                int aux = yeasrWinner.get(i) - yeasrWinner.get(i-1);
+
+                if (aux > intervaloMaximo) {
+                    intervaloMaximo = aux;
+                }
+            }
+        }
+
+        System.out.println("\n\nMaior intervalo localizado foi: " + intervaloMaximo);
+
+        // Obtem o menor intervalo de prêmio obtido
+        HashMap<String, List<Integer>> hashProducersWinnersMax = new HashMap<String, List<Integer>>();
+
+        for (Map.Entry m : hashProducersWinners.entrySet()) {
+            List<Integer> yeasrWinner = (List<Integer>)m.getValue();
+
+            for (int i = 1; i <= yeasrWinner.size()-1; i++) {
+                int aux = yeasrWinner.get(i) - yeasrWinner.get(i-1);
+
+                if (aux == intervaloMaximo) {
+                    hashProducersWinnersMax.put((String)m.getKey(), (List<Integer>)m.getValue());
+                    break;
+                }
+            }
+        }
+
+        System.out.println("\n\nLista dos Produtores que receberam o prêmio no maior intervalo localizado: \n");
+        for (Map.Entry m : hashProducersWinnersMax.entrySet()) {
+            System.out.println(m.getKey()+" "+m.getValue());
+        }
+
+        // Obtem o primeiro que obteve dois prêmios com maior intervalo
+        int anoInicialMaisRapido = 0;
+        String nomeProdutorMaisRapido = "";
+        int previous = 0;
+        int followin = 0;
+
+        for (Map.Entry m : hashProducersWinnersMax.entrySet()) {
+            List<Integer> yeasrWinner = (List<Integer>)m.getValue();
+
+            for (int i = 1; i <= yeasrWinner.size()-1; i++) {
+                int aux = yeasrWinner.get(i) - yeasrWinner.get(i-1);
+
+                if ((aux == intervaloMaximo) && 
+                    ((anoInicialMaisRapido == 0) || (yeasrWinner.get(i-1) < anoInicialMaisRapido))) {
+                        anoInicialMaisRapido = yeasrWinner.get(i-1);
+                        nomeProdutorMaisRapido = (String)m.getKey();
+                        previous = yeasrWinner.get(i-1);
+                        followin = yeasrWinner.get(i);
+                }
+            }
+        }
+
+        System.out.println("\n\nMenor Ano inicial localizado dentro do intervalo máximo: " + anoInicialMaisRapido);
+        System.out.println("\nNome do Produtor: " + nomeProdutorMaisRapido);
+
+        ProducerVO minProducerVO = new ProducerVO();
+        minProducerVO.setProducer(nomeProdutorMaisRapido);
+        minProducerVO.setPreviousWin(previous);
+        minProducerVO.setFollowingWin(followin);
+        minProducerVO.setInterval(intervaloMaximo);
+        
+        return minProducerVO;
     }
 }

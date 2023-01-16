@@ -52,7 +52,6 @@ public class PiorFilmeResource {
 
     @GetMapping("list")
     public List<PiorFilme> listMovies() {
-        // PiorFilme.listAll(Sort.by("campo1").and("campo2").ascending());
         return PiorFilme.listAll();
     }
 
